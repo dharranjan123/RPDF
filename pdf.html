@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to Excel Converter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.1/xlsx.full.min.js"></script>
+</head>
+<body>
+    <h1>PDF to Excel Converter</h1>
+    <input type="file" id="file-input" />
+    <button id="convert-btn">Convert to Excel</button>
+    <br><br>
+    <a id="download-link" style="display:none;" download="output.xlsx">Download Excel File</a>
+    
+    <script>
+        document.getElementById('convert-btn').addEventListener('click', () => {
+            let fileInput = document.getElementById('file-input');
+            if (fileInput.files.length === 0) {
+                alert("Please upload a PDF file!");
+                return;
+            }
+            let file = fileInput.files[0];
+            let reader = new FileReader();
+            
+            reader.onload = function(event) {
+                let pdfData = new Uint8Array(event.target.result);
+                
+                // PDF.js loading
+                pdfjsLib.getDocument(pdfData).promise.then(pdf => {
+                    let numPages = pdf.numPages;
+                    let textContent = [];
+
+                    // Extract text from each page
+                    let pagePromises = [];
+                    for (let i = 1; i <= numPages; i++) {
+                        pagePromises.push(pdf.getPage(i).then(page => {
+                            return page.getTextContent().then(content => {
+                                textContent.push(content.items.map(item => item.str).join(' '));
+                            });
+                        }));
+                    }
+
+                    Promise.all(pagePromises).then(() => {
+                        let excelData = textContent.map(pageText => {
+                            return [pageText];
+                        });
+
+                        // Convert to Excel
+                        let ws = XLSX.utils.aoa_to_sheet(excelData);
+                        let wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "PDF Data");
+
+                        // Generate Excel file
+                        let excelFile = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+
+                        // Trigger download
+                        let downloadLink = document.getElementById('download-link');
+                        let blob = new Blob([excelFile], { type: "application/octet-stream" });
+                        downloadLink.href = URL.createObjectURL(blob);
+                        downloadLink.style.display = 'inline-block';
+                    });
+                });
+            };
+
+            reader.readAsArrayBuffer(file);
+        });
+    </script>
+</body>
+</html>
